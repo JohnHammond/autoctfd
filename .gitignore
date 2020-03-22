@@ -1,2 +1,5 @@
 .env
 __pycache__
+*.zip
+**/__pycache__
+autoctfd/__pycache__

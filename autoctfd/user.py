@@ -5,10 +5,10 @@ This class is primary used to generate the admin account
 
 """
 
-import json
-from passlib.hash import bcrypt_sha256
 import time
 import datetime
+
+from passlib.hash import bcrypt_sha256
 from autoctfd.jsonskeleton import JSON
 
 
@@ -20,7 +20,6 @@ class User(JSON):
         should be necessary in the CTFd JSON format.
         """
 
-        self.id = 1
         self.oauth_id = None
         self.name = name
         self.password = bcrypt_sha256.hash(str(password))
@@ -30,6 +29,7 @@ class User(JSON):
         self.affiliation = None
         self.country = None
         self.bracket = None
+        self.secret = None
         self.hidden = True if hidden else False
         self.banned = False
         self.verified = True

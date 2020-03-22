@@ -10,9 +10,14 @@ import tempfile
 import zipfile
 import json
 from pprint import pprint
+import shutil
 
 from autoctfd.user import User
+from autoctfd.config import Config
 from autoctfd.jsonskeleton import JSON
+
+# from autoctfd.builders import build_users
+import autoctfd.builders
 
 
 argparser = argparse.ArgumentParser(
@@ -20,6 +25,7 @@ argparser = argparse.ArgumentParser(
 )
 
 argparser.add_argument("--name", "-n", type=str, required=True)
+argparser.add_argument("--output", "-o", type=str, required=True)
 
 args = argparser.parse_args()
 
@@ -48,33 +54,47 @@ NECESSARY_JSON = [
     "users.json",
 ]
 
-"""
-These JSON files will need to be recreated dynamically.
-"""
-RECREATE_JSON = [
-    "config.json",
-    "challenges.json",
-    "files.json",
-    "flags.json",
-    "pages.json",
-    "users.json",
-]
+BASE_JSON_DIR = "_json"
+
 
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
-FINAL_ZIPFILE_NAME = "newfile.zip"
+FINAL_ZIPFILE_NAME = args.output.replace(".zip", "") + ".zip"
 FINAL_ZIPFILE_PATH = os.path.join(CURRENT_DIR, FINAL_ZIPFILE_NAME)
 NECESSARY_DIRS = ["db", "uploads"]
 
 
-admin_user = User("Admin", "passwords", "admin@admin.com", admin=True, hidden=True)
+class Setup:
+    def __init__(self):
 
-"""
-Build the users JSON file
-"""
-UserJSON = JSON()
-UserJSON.meta = {}
-UserJSON.results = [vars(admin_user)]
-UserJSON.count = len(UserJSON.results)
+        self.ctf_name = input("CTF Name: ")
+        self.ctf_description = input("CTF description: ")
+
+        self.admin_username = input("Administrator Username: ")
+        self.admin_password = getpass.getpass("Administrator Password: ")
+        self.admin_email = input("Administrator E-mail:  ")
+
+
+setup = Setup()
+
+RECREATE_JSON = {
+    "config.json": autoctfd.builders.build_config(
+        Config(setup.ctf_name, setup.ctf_description)
+    ),
+    "tracking.json": autoctfd.builders.build_tracking(),
+    "challenges.json": autoctfd.builders.build_challenges(),  # to-do
+    "files.json": autoctfd.builders.build_files(),  # to-do
+    "flags.json": autoctfd.builders.build_flags(),  # to-do
+    # "pages.json": autoctfd.builders.build_pages(),  # to-do
+    "users.json": autoctfd.builders.build_users(
+        User(
+            setup.admin_username,
+            setup.admin_password,
+            setup.admin_email,
+            admin=True,
+            hidden=True,
+        )
+    ),
+}
 
 
 def build_zip():
@@ -83,8 +103,15 @@ def build_zip():
 
         # Create each necessary directory
         for directory in NECESSARY_DIRS:
-            ctfd_db_dir = os.path.join(ctfd_dir, directory)
-            os.mkdir(ctfd_db_dir)
+            ctfd_inner_dir = os.path.join(ctfd_dir, directory)
+            if directory == "db":
+                ctfd_db_dir = ctfd_inner_dir
+            os.mkdir(ctfd_inner_dir)
+
+        # Copy all the other files into the directory
+        for j in NECESSARY_JSON:
+            original_path = os.path.join(BASE_JSON_DIR, j)
+            shutil.copy(original_path, ctfd_db_dir)
 
         # Hop to the CTFd directory so the ZIP file has correct paths
         os.chdir(ctfd_dir)
@@ -92,7 +119,26 @@ def build_zip():
         # Now put all of the directories in the ZIP file
         with zipfile.ZipFile(FINAL_ZIPFILE_PATH, "w") as ctfd_zip:
             for directory in NECESSARY_DIRS:
-                ctfd_zip.write(directory)
+
+                # Recursively grab all the files
+                for root, dirs, files in os.walk(directory):
+                    for file in files:
+                        new_json = os.path.join(root, file)
+                        if file not in RECREATE_JSON:
+                            ctfd_zip.write(new_json)
+                        else:
+                            # Use the regenerated file
+                            with open(new_json, "w") as handle:
+                                data = RECREATE_JSON[file]
+                                if data is not None:
+                                    handle.write(repr(data))
+                                else:
+                                    handle.write("")
+
+                            ctfd_zip.write(new_json)
 
         # Switch back to our directory for safety
         os.chdir(CURRENT_DIR)
+
+
+build_zip()
