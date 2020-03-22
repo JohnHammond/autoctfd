@@ -1,0 +1,19 @@
+{
+    "name" : "Demo Challenge",
+    "category" : "Warmups",
+
+    "description" : "This is the challenge prompt!\n\nWelcome to the party!",
+
+    "max_attempts" : 0,
+    "value" : 50,
+
+    "type" : "standard",
+    "state" : "visible",
+
+    "requirements" : null,
+    
+    "_files":[
+        "afile.png"
+    ]
+
+}

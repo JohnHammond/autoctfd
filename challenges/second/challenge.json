@@ -1,0 +1,19 @@
+{
+    "name" : "Second Challenge",
+    "category" : "Warmups",
+
+    "description" : "Now we have another challenge!",
+
+    "max_attempts" : 0,
+    "value" : 10,
+
+    "type" : "standard",
+    "state" : "visible",
+
+    "requirements" : null,
+    
+    "_files":[
+        "prompt.txt"
+    ]
+
+}

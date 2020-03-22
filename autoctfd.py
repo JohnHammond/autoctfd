@@ -16,7 +16,6 @@ from autoctfd.user import User
 from autoctfd.config import Config
 from autoctfd.jsonskeleton import JSON
 
-# from autoctfd.builders import build_users
 import autoctfd.builders
 
 
@@ -56,7 +55,6 @@ NECESSARY_JSON = [
 
 BASE_JSON_DIR = "_json"
 
-
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 FINAL_ZIPFILE_NAME = args.output.replace(".zip", "") + ".zip"
 FINAL_ZIPFILE_PATH = os.path.join(CURRENT_DIR, FINAL_ZIPFILE_NAME)
@@ -80,11 +78,7 @@ RECREATE_JSON = {
     "config.json": autoctfd.builders.build_config(
         Config(setup.ctf_name, setup.ctf_description)
     ),
-    "tracking.json": autoctfd.builders.build_tracking(),
-    "challenges.json": autoctfd.builders.build_challenges(),  # to-do
-    "files.json": autoctfd.builders.build_files(),  # to-do
-    "flags.json": autoctfd.builders.build_flags(),  # to-do
-    # "pages.json": autoctfd.builders.build_pages(),  # to-do
+    "pages.json": autoctfd.builders.build_pages(),
     "users.json": autoctfd.builders.build_users(
         User(
             setup.admin_username,
@@ -106,7 +100,20 @@ def build_zip():
             ctfd_inner_dir = os.path.join(ctfd_dir, directory)
             if directory == "db":
                 ctfd_db_dir = ctfd_inner_dir
+
+            if directory == "uploads":
+                ctfd_uploads_dir = ctfd_inner_dir
+
             os.mkdir(ctfd_inner_dir)
+
+        # Now stage in all the challenges files.
+        ChallengesJSON, FilesJSON, FlagsJSON = autoctfd.builders.build_challenges(
+            ctfd_uploads_dir
+        )
+
+        RECREATE_JSON["challenges.json"] = ChallengesJSON
+        RECREATE_JSON["files.json"] = FilesJSON
+        RECREATE_JSON["flags.json"] = FlagsJSON
 
         # Copy all the other files into the directory
         for j in NECESSARY_JSON:
