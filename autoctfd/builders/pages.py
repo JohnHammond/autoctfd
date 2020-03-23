@@ -6,7 +6,7 @@ import glob
 import os
 
 
-from autoctfd.templates.pages import Page
+from autoctfd.templates.page import Page
 
 from autoctfd.templates.rawjson import JSON
 
