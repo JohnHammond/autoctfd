@@ -9,7 +9,7 @@ import time
 import datetime
 
 from passlib.hash import bcrypt_sha256
-from autoctfd.jsonskeleton import JSON
+from autoctfd.templates.rawjson import JSON
 
 
 class User(JSON):

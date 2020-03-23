@@ -5,7 +5,7 @@ This class is used to generate pages accessible within the CTF.
 
 """
 
-from autoctfd.jsonskeleton import JSON
+from autoctfd.templates.rawjson import JSON
 
 
 class Page(JSON):

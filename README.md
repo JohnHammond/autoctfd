@@ -12,3 +12,12 @@ with regenerated challenges.
 
 **This project is still in development.**
 
+# Usage
+
+```
+
+```
+
+# Files and Directories
+
+```

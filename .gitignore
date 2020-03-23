@@ -3,3 +3,4 @@ __pycache__
 *.zip
 **/__pycache__
 autoctfd/__pycache__
+*.ini

@@ -9,7 +9,8 @@ import json
 import hashlib
 import shutil
 
-from autoctfd.jsonskeleton import JSON
+from autoctfd.templates.rawjson import JSON
+from autoctfd.output import *
 
 
 def generate_challenges(ctfd_upload_path: str):
@@ -70,6 +71,8 @@ def generate_challenges(ctfd_upload_path: str):
             if generate_script is not None:
                 # If the generate script is executable, run it!
                 if is_executable(generate_script):
+                    info(f"generating {Fore.YELLOW}{chal}{Fore.RESET}")
+
                     p = subprocess.Popen(
                         generate_script,
                         stdin=subprocess.PIPE,
@@ -79,6 +82,7 @@ def generate_challenges(ctfd_upload_path: str):
                     p.wait()
 
             if os.path.exists(challenge_json_filename):
+
                 challenge_json = json.load(open(challenge_json_filename))
 
                 files = challenge_json.pop("_files")

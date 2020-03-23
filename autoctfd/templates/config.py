@@ -5,7 +5,7 @@ This class is used to recreate the config files of the CTFd instance
 
 """
 
-from autoctfd.jsonskeleton import JSON
+from autoctfd.templates.rawjson import JSON
 
 
 class Config(JSON):

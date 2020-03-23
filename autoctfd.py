@@ -1,33 +1,85 @@
 #!/usr/bin/env python3
 
 import os
-
 import argparse
 import readline
 import getpass
-from passlib.hash import bcrypt_sha256
 import tempfile
 import zipfile
 import json
 from pprint import pprint
 import shutil
+import configparser
+from colorama import *
 
-from autoctfd.user import User
-from autoctfd.config import Config
-from autoctfd.jsonskeleton import JSON
+import autoctfd.output as output
 
-import autoctfd.builders
+from autoctfd.templates.rawjson import JSON
+from autoctfd.templates.config import Config
+from autoctfd.templates.user import User
+
+from autoctfd.builders.users import build_users
+from autoctfd.builders.pages import build_pages
+from autoctfd.builders.config import build_config
+
+from autoctfd.generators.challenges import generate_challenges
 
 
 argparser = argparse.ArgumentParser(
-    description="Generate a CTFd out of predefined challenges"
+    description="Create a CTFd importable database out of predefined challenges"
 )
 
-argparser.add_argument("--name", "-n", type=str, required=True)
-argparser.add_argument("--output", "-o", type=str, required=True)
+argparser.add_argument(
+    "--config", "-c", type=str, required=True, help="a .ini config file for ctf detail"
+)
+argparser.add_argument(
+    "--output",
+    "-o",
+    type=str,
+    required=True,
+    help="a .zip output for the generated ctfd data",
+)
 
 args = argparser.parse_args()
 
+
+if not os.path.exists(args.config):
+    output.fatal_error(
+        f"config file {Fore.YELLOW}{Style.BRIGHT}'{args.config}'{Fore.RESET}{Style.RESET_ALL} does not exist!"
+    )
+
+config = configparser.ConfigParser()
+try:
+    config.read(args.config)
+
+except configparser.MissingSectionHeaderError:
+    output.fatal_error(
+        f"no section headers in {Fore.YELLOW}{Style.BRIGHT}'{args.config}'{Fore.RESET}{Style.RESET_ALL}!"
+    )
+
+if "ctf" not in config.sections():
+    output.fatal_error(
+        f"no 'ctf' section in {Fore.YELLOW}{Style.BRIGHT}'{args.config}'{Fore.RESET}{Style.RESET_ALL}!"
+    )
+
+"""
+This are the required configuration settings in the user supplied config file.
+"""
+required_configs = [
+    "name",
+    "description",
+    "admin",
+    "password",
+    "email",
+]
+
+for required in required_configs:
+    if required not in config["ctf"]:
+        output.error(f"no '{required}' setting in'{args.config}'!")
+    else:
+        output.success(
+            f"loaded ctf config {Fore.CYAN}{Style.BRIGHT}{required}{Fore.RESET}{Style.RESET_ALL}: {Fore.GREEN}{Style.BRIGHT}{config['ctf'][required]}{Fore.RESET}{Style.RESET_ALL}"
+        )
 
 """
 These JSON files are necessary in the `db` directory of the CTFd ZIP.
@@ -54,36 +106,22 @@ NECESSARY_JSON = [
 ]
 
 BASE_JSON_DIR = "_json"
-
 CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
 FINAL_ZIPFILE_NAME = args.output.replace(".zip", "") + ".zip"
 FINAL_ZIPFILE_PATH = os.path.join(CURRENT_DIR, FINAL_ZIPFILE_NAME)
 NECESSARY_DIRS = ["db", "uploads"]
 
 
-class Setup:
-    def __init__(self):
-
-        self.ctf_name = input("CTF Name: ")
-        self.ctf_description = input("CTF description: ")
-
-        self.admin_username = input("Administrator Username: ")
-        self.admin_password = getpass.getpass("Administrator Password: ")
-        self.admin_email = input("Administrator E-mail:  ")
-
-
-setup = Setup()
-
 RECREATE_JSON = {
-    "config.json": autoctfd.builders.build_config(
-        Config(setup.ctf_name, setup.ctf_description)
+    "config.json": build_config(
+        Config(config["ctf"]["name"], config["ctf"]["description"])
     ),
-    "pages.json": autoctfd.builders.build_pages(),
-    "users.json": autoctfd.builders.build_users(
+    "pages.json": build_pages(),
+    "users.json": build_users(
         User(
-            setup.admin_username,
-            setup.admin_password,
-            setup.admin_email,
+            config["ctf"]["admin"],
+            config["ctf"]["password"],
+            config["ctf"]["email"],
             admin=True,
             hidden=True,
         )
@@ -92,11 +130,15 @@ RECREATE_JSON = {
 
 
 def build_zip():
+    output.info("beginning to bundle CTFd zip file")
 
     with tempfile.TemporaryDirectory() as ctfd_dir:
+        output.info(f"creating temporary directory {Fore.CYAN}{ctfd_dir}{Fore.RESET}")
 
         # Create each necessary directory
         for directory in NECESSARY_DIRS:
+            output.info(f"creating inner directory {Fore.CYAN}{directory}{Fore.RESET}")
+
             ctfd_inner_dir = os.path.join(ctfd_dir, directory)
             if directory == "db":
                 ctfd_db_dir = ctfd_inner_dir
@@ -107,9 +149,7 @@ def build_zip():
             os.mkdir(ctfd_inner_dir)
 
         # Now stage in all the challenges files.
-        ChallengesJSON, FilesJSON, FlagsJSON = autoctfd.builders.build_challenges(
-            ctfd_uploads_dir
-        )
+        ChallengesJSON, FilesJSON, FlagsJSON = generate_challenges(ctfd_uploads_dir)
 
         RECREATE_JSON["challenges.json"] = ChallengesJSON
         RECREATE_JSON["files.json"] = FilesJSON
@@ -131,11 +171,24 @@ def build_zip():
                 for root, dirs, files in os.walk(directory):
                     for file in files:
                         new_json = os.path.join(root, file)
+
                         if file not in RECREATE_JSON:
+                            if file not in NECESSARY_JSON:
+                                output.info(
+                                    f"copying {Fore.MAGENTA}{new_json}{Fore.RESET}"
+                                )
+                            else:
+                                output.info(
+                                    f"templating {Fore.MAGENTA}{new_json}{Fore.RESET}"
+                                )
+
                             ctfd_zip.write(new_json)
                         else:
                             # Use the regenerated file
                             with open(new_json, "w") as handle:
+                                output.info(
+                                    f"building {Fore.MAGENTA}{Style.BRIGHT}{new_json}{Style.RESET_ALL}{Fore.RESET}"
+                                )
                                 data = RECREATE_JSON[file]
                                 if data is not None:
                                     handle.write(repr(data))
@@ -143,6 +196,9 @@ def build_zip():
                                     handle.write("")
 
                             ctfd_zip.write(new_json)
+        output.success(
+            f"created {Fore.GREEN}{Style.BRIGHT}{FINAL_ZIPFILE_NAME}{Fore.RESET}{Style.RESET_ALL}"
+        )
 
         # Switch back to our directory for safety
         os.chdir(CURRENT_DIR)
